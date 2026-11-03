@@ -116,6 +116,7 @@ function Game() {
           {feedback ? <View style={styles.card} accessibilityLiveRegion="polite">
             <Label>{feedback.correct ? 'CORRECT  /  +10 COINS' : 'MISS  /  −1 LIFE'}</Label>
             <Text style={[styles.heading,{color:feedback.correct?green:'#ffa28a'}]}>{lines[(game.index-1)%lines.length]}</Text>
+            {!!feedback.prompt && <Text style={styles.answer}>{feedback.prompt}</Text>}
             <Text style={styles.copy}>Your answer · {feedback.submitted}</Text>
             <Text style={styles.heading}>{feedback.answer}</Text><Text style={styles.copy}>{feedback.explanation}</Text>
             <Label>FROM YOUR NOTES{feedback.location ? '  /  '+feedback.location : ''}</Label><Text style={styles.quote}>“{feedback.quote}”</Text>

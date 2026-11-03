@@ -70,6 +70,7 @@ test('API supports upload, both question formats, evidence, rewards and extra li
   assert.deepEqual(await post('/life',purchase),bought);
   const miss=await reply(second.question.id,'Melting');
   assert.equal(miss.lives,3); assert.equal(miss.feedback.answer,'Evaporation');
+  assert.equal(miss.feedback.prompt,'Choose the process for liquid to gas.');
   assert.equal(miss.feedback.quote,choice.quote); assert.equal(miss.feedback.correct,false);
   assert.equal(miss.reviewNotes,undefined);
   assert.equal(miss.question.review,true);

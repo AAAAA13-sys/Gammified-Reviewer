@@ -133,7 +133,7 @@ const server = http.createServer(async (req,res) => {
         try {
           const { correct, explanation } = await gradeAnswer(q, body.answer, s.voice);
           award(s,correct);
-          result = {...view(s), feedback:{correct,submitted:body.answer,answer:q.answer,quote:q.quote,explanation,location:q.location}};
+          result = {...view(s), feedback:{correct,prompt:q.prompt,submitted:body.answer,answer:q.answer,quote:q.quote,explanation,location:q.location}};
           s.lastAnswer = {id:q.id, submitted:body.answer, feedback:result.feedback};
         } finally { s.busy = false; }
       } else throw fail('Unknown route.',404);
