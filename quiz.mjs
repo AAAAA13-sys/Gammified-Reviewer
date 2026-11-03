@@ -19,12 +19,17 @@ export function makeSession(items, source, pages = []) {
 
 export function view(s) {
   const q = s.questions[s.index];
+  const reviewNotes = (!q || !s.lives) ? s.questions.filter(item=>item.review).map(item=>({
+    prompt:item.prompt, answer:item.answer, quote:item.quote, location:item.location, recovered:item.recovered === true,
+  })) : undefined;
   return { index: s.index, total: s.questions.length, lives: s.lives, coins: s.coins, correct: s.correct,
+    reviewNotes,
     question: q && s.lives ? { id: q.id, review: q.review, prompt: q.prompt, type: q.type, options: q.type === 'choice' ? q.options : [] } : null };
 }
 
 export function award(s, correct) {
   const q = s.questions[s.index++];
+  if (q.review) q.recovered = correct;
   if (correct) { s.correct++; s.coins += 10; }
   else {
     s.lives--;

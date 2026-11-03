@@ -127,8 +127,14 @@ function Game() {
               <TextInput accessibilityLabel="Your answer" multiline maxLength={2000} editable={!busy} placeholder="Ano ang sagot mo?" placeholderTextColor="#aaa" style={styles.input} value={answer} onChangeText={setAnswer}/>}
             <Button disabled={!answer.trim() || !!busy} onPress={submit}>Lock in answer  →</Button>
           </View> : <View style={styles.card}><Label>RUN REPORT</Label>
-            <Text style={styles.heading}>{game.index===game.total ? 'Reviewer cleared.' : 'Out of lives.'}</Text>
+            <Text style={styles.heading}>{game.lives ? 'Run complete.' : 'Out of lives.'}</Text>
             <Text style={styles.copy}>{game.correct} correct · {game.index} answered · {game.total} questions</Text>
+            {game.reviewNotes?.map((note,i)=><View style={styles.reviewNote} key={i}>
+              <Label>{note.recovered ? 'RECALLED ON RETRY' : 'PRACTICE AGAIN'}</Label>
+              <Text style={styles.copy}>{note.prompt}</Text>
+              <Text style={styles.answer}>{note.answer}</Text>
+              <Text style={styles.quote}>“{note.quote}”{note.location ? ' · '+note.location : ''}</Text>
+            </View>)}
             <Button disabled={!!busy} onPress={reset}>Start another run</Button>
           </View>}
           {game.index<game.total && <Button secondary disabled={game.coins<20 || !!busy} onPress={buy}>+1 life  /  20 coins</Button>}
@@ -149,4 +155,5 @@ const styles = StyleSheet.create({
   buttonLabel:{color:ink,fontSize:16,fontWeight:'700'},stat:{color:paper,fontWeight:'700',backgroundColor:'#303932',borderRadius:6,padding:10},
   track:{backgroundColor:'#354137',height:6,borderRadius:4,overflow:'hidden'},input:{backgroundColor:ink,color:paper,borderColor:'#69756b',borderWidth:1,borderRadius:8,padding:14,minHeight:95,fontSize:16,textAlignVertical:'top'},
   quote:{color:paper,fontStyle:'italic',lineHeight:24,fontSize:16,borderLeftWidth:3,borderColor:green,paddingLeft:12},error:{color:'#ffbba6',fontSize:16},
+  reviewNote:{gap:8,borderTopWidth:1,borderColor:'#495349',paddingTop:16},answer:{color:paper,fontWeight:'700',fontSize:18},
 });

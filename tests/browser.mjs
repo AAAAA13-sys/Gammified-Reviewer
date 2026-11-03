@@ -76,6 +76,7 @@ try {
     await click('Next question →'); await page.getByText(/RECALL RETRY/).waitFor();
     await click('A Aorta'); await click('Lock in answer →'); await click('View results →');
     await page.getByText('3 correct · 4 answered · 4 questions').waitFor();
+    await page.getByText('RECALLED ON RETRY',{exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
     assert.deepEqual(errors,[]);
     await click('Start another run');

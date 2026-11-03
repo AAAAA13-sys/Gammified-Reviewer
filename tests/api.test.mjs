@@ -69,11 +69,15 @@ test('API supports upload, both question formats, evidence, rewards and extra li
   const miss=await reply(second.question.id,'Melting');
   assert.equal(miss.lives,3); assert.equal(miss.feedback.answer,'Evaporation');
   assert.equal(miss.feedback.quote,choice.quote); assert.equal(miss.feedback.correct,false);
+  assert.equal(miss.reviewNotes,undefined);
   assert.equal(miss.question.review,true);
   assert.notEqual(miss.question.id,second.question.id);
   const reviewed=await reply(miss.question.id,'Melting');
   assert.equal(reviewed.question,null);
   assert.equal(reviewed.index,4);
+  assert.deepEqual(reviewed.reviewNotes,[{
+    prompt:'Choose the process for liquid to gas.', answer:'Evaporation', quote:choice.quote, location:null, recovered:false,
+  }]);
   assert.equal((await post('/quiz',{name:'bad.exe',data:'YQ=='})).status,400);
   for (const ext of ['docx','pdf']) {
     const bytes=await readFile(new URL('./fixtures/water-cycle.'+ext,import.meta.url));
