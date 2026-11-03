@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 
@@ -20,7 +22,7 @@ async function post(path, body) {
   try { r = await fetch(api + path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); }
   catch { throw Error('Cannot reach the quiz server. Check its address and connection.'); }
   const data = await r.json();
-  if (!r.ok) throw Error(data.error || 'Request failed.');
+  if (!r.ok) throw Object.assign(Error(data.error || 'Request failed.'),{status:r.status});
   return data;
 }
 async function readAsset(asset) {
@@ -39,9 +41,20 @@ function Button({children,onPress,disabled,secondary}) {
 }
 function Label({children}) {return <Text style={styles.label}>{children}</Text>;}
 export default function App() {
+  return <SafeAreaProvider><Game/></SafeAreaProvider>;
+}
+const storageKey = 'recall-riot:session:' + api;
+function Game() {
   const [asset,setAsset] = useState(null), [game,setGame] = useState(null), [token,setToken] = useState('');
   const [feedback,setFeedback] = useState(null), [answer,setAnswer] = useState(''), [voice,setVoice] = useState('Tagalog');
   const [busy,setBusy] = useState(''), [error,setError] = useState('');
+  const [saved,setSaved] = useState(''), [runName,setRunName] = useState('');
+  useEffect(()=>{AsyncStorage.getItem(storageKey).then(value=>setSaved(value || '')).catch(()=>{});},[]);
+  function remember(value) {
+    setSaved(value);
+    const update = value ? AsyncStorage.setItem(storageKey,value) : AsyncStorage.removeItem(storageKey);
+    update.catch(()=>{});
+  }
   async function perform(message,fn) {
     if (busy) return;
     setBusy(message); setError('');
@@ -56,15 +69,22 @@ export default function App() {
     }
   }); }
   function start() { perform('Reading notes and writing questions…',async()=>{
-    const result = await post('/quiz',{name:asset.name,data:await readAsset(asset)});
-    setToken(result.token); setGame(result); setFeedback(null); setAnswer('');
+    const result = await post('/quiz',{name:asset.name,voice,data:await readAsset(asset)});
+    setToken(result.token); remember(result.token); setRunName(asset.name); setGame(result); setFeedback(null); setAnswer('');
+  }); }
+  function resume() { perform('Restoring run…',async()=>{
+    let result;
+    try { result = await post('/resume',{token:saved}); }
+    catch(e) { if(e.status===404) remember(''); throw e; }
+    setToken(saved); setRunName(result.name); setVoice(result.voice);
+    setGame(result); setFeedback(result.feedback || null); setAnswer('');
   }); }
   function submit() { perform('Checking your recall…',async()=>{
     const result = await post('/answer',{token,id:game.question.id,answer});
     setGame(result); setFeedback({...result.feedback,submitted:answer}); setAnswer('');
   }); }
-  function buy() { perform('Trading coins…',async()=>setGame(await post('/life',{token}))); }
-  function reset() {setGame(null);setFeedback(null);setAnswer('');setError('');}
+  function buy() { perform('Trading coins…',async()=>setGame(await post('/life',{token,coins:game.coins,lives:game.lives}))); }
+  function reset() {remember('');setGame(null);setFeedback(null);setAnswer('');setError('');}
   const q = game?.question;
   const lines = feedback && voices[voice][feedback.correct ? 'win' : 'miss'];
   return <SafeAreaView style={styles.root}><StatusBar barStyle="light-content" backgroundColor={ink}/>
@@ -75,6 +95,7 @@ export default function App() {
           <Label>01  /  TRAINING ROOM</Label>
           <Text style={styles.title}>Notes mo.{'\n'}<Text style={{color:green}}>Sagot mo.</Text></Text>
           <Text style={styles.copy}>Turn your study file into a recall run. Tama? May coins. Mali? May resibo at trashtalk.</Text>
+          {!!saved && <Button secondary disabled={!!busy} onPress={resume}>Resume last run  →</Button>}
           <View style={styles.card}><Label>STUDY MATERIAL</Label>
             <Text style={styles.heading}>{asset?.name || 'Bring your reviewer'}</Text>
             <Text style={styles.copy}>PDF, DOCX, TXT or Markdown · up to 3 MB</Text>
@@ -85,7 +106,7 @@ export default function App() {
           <Text style={styles.copy}>Uncensored roast mode. Starting sends your notes to the configured AI provider.</Text>
           <Button onPress={start} disabled={!asset || !!busy}>Start recall run  →</Button>
         </> : <>
-          <Label>{asset.name}</Label>
+          <Label>{runName}</Label>
           <View style={styles.row}><Text style={styles.stat}>♥  {game.lives} lives</Text><Text style={styles.stat}>●  {game.coins} coins</Text></View>
           <View style={styles.track}><View style={{height:6,width:(100*game.index/game.total)+'%',backgroundColor:green}}/></View>
           {feedback ? <View style={styles.card} accessibilityLiveRegion="polite">
@@ -96,7 +117,7 @@ export default function App() {
             <Label>FROM YOUR NOTES</Label><Text style={styles.quote}>“{feedback.quote}”</Text>
             <Button disabled={!!busy} onPress={()=>setFeedback(null)}>{q ? 'Next question  →' : 'View results  →'}</Button>
           </View> : q ? <View style={styles.card}>
-            <Label>QUESTION {game.index+1} / {game.total}   ·   {q.type==='choice'?'PICK ONE':'WRITE IT'}</Label>
+            <Label>{q.review ? 'RECALL RETRY' : 'QUESTION'} {game.index+1} / {game.total}   ·   {q.type==='choice'?'PICK ONE':'WRITE IT'}</Label>
             <Text style={styles.heading}>{q.prompt}</Text>
             {q.type==='choice' ? q.options.map((item,i)=><Button key={item} secondary={answer!==item} disabled={!!busy} onPress={()=>setAnswer(item)}>{String.fromCharCode(65+i)}   {item}</Button>) :
               <TextInput accessibilityLabel="Your answer" multiline maxLength={2000} editable={!busy} placeholder="Ano ang sagot mo?" placeholderTextColor="#aaa" style={styles.input} value={answer} onChangeText={setAnswer}/>}

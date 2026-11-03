@@ -11,7 +11,7 @@ export function makeSession(items, source) {
     if (q.type === 'choice' && (!Array.isArray(q.options) || q.options.length !== 4 ||
       q.options.some(s => typeof s !== 'string' || !s.trim()) || new Set(q.options.map(normalize)).size !== 4 ||
       !q.options.includes(q.answer))) throw Error('Invalid options.');
-    return { ...q, id: randomUUID() };
+    return { ...q, review: false, id: randomUUID() };
   });
   return { questions, index: 0, lives: 3, coins: 0, correct: 0, busy: false, expires: Date.now() + 3600000 };
 }
@@ -19,11 +19,14 @@ export function makeSession(items, source) {
 export function view(s) {
   const q = s.questions[s.index];
   return { index: s.index, total: s.questions.length, lives: s.lives, coins: s.coins, correct: s.correct,
-    question: q && s.lives ? { id: q.id, prompt: q.prompt, type: q.type, options: q.type === 'choice' ? q.options : [] } : null };
+    question: q && s.lives ? { id: q.id, review: q.review, prompt: q.prompt, type: q.type, options: q.type === 'choice' ? q.options : [] } : null };
 }
 
 export function award(s, correct) {
-  s.index++;
+  const q = s.questions[s.index++];
   if (correct) { s.correct++; s.coins += 10; }
-  else s.lives--;
+  else {
+    s.lives--;
+    if (!q.review) s.questions.push({ ...q, id: randomUUID(), review: true });
+  }
 }

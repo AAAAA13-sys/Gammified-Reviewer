@@ -54,18 +54,31 @@ const server = http.createServer(async (req,res) => {
     let result;
     if (req.url === '/quiz') {
       const notes = await extract(body.name,body.data);
-      const output = await ai('Create up to 8 distinct active recall questions solely from the notes. Use both typed and four-option choice questions when material supports both. Choose format per concept. Use the language of the material. Return {questions:[{type:"typed" or "choice",prompt,answer,options,quote,explanation}]}. Quote a short exact passage verbatim. Explanation must teach why the answer follows. For choice, answer must exactly match one option. If insufficient facts return empty questions.',{notes});
+      const voice = body.voice === 'Bisaya' ? 'Bisaya' : 'Tagalog';
+      const output = await ai('Create up to 8 distinct active recall questions solely from the study notes. Use typed recall for explanations and definitions. Use four-option multiple choice for distinctions or classifications. Include both formats when supported. Use the language of the material for questions and answers. Return {questions:[{type:"typed" or "choice",prompt,answer,options,quote,explanation}]}. Quote a short exact passage verbatim. Write the teaching explanation in the requested feedback language, preserving important technical terms. Explain why the answer follows. For choice, answer must exactly match one option. If insufficient facts return empty questions.',{notes,feedbackLanguage:voice});
       if (!output.questions?.length) throw fail('No quiz-worthy facts found. Try fuller notes.');
       let s;
       try { s = makeSession(output.questions,notes); } catch { throw fail('Generated questions failed the evidence check. Retry the upload.',502); }
+      s.name = body.name;
+      s.voice = voice;
       const token = randomUUID(); sessions.set(token,s); result = {token,...view(s)};
     } else {
       const s = sessions.get(body.token);
       if (!s || s.expires < Date.now()) throw fail('Session expired. Start another run.',404);
       if (s.busy) throw fail('Answer is being checked.',409);
-      if (req.url === '/life') {
-        if (s.coins < 20 || s.index >= s.questions.length) throw fail('An extra life costs 20 coins during a run.');
-        s.coins -= 20; s.lives++; result = view(s);
+      if (req.url === '/resume') {
+        result = {...view(s), name:s.name, voice:s.voice, feedback:s.lastAnswer?.feedback};
+      } else if (req.url === '/life') {
+        if (s.lastPurchase?.index === s.index && body.coins === s.lastPurchase.coins && body.lives === s.lastPurchase.lives) {
+          result = view(s);
+        } else {
+          if (s.coins < 20 || s.index >= s.questions.length) throw fail('An extra life costs 20 coins during a run.');
+          if (s.coins !== body.coins || s.lives !== body.lives) throw fail('Balance changed. Resume the current run.',409);
+          s.lastPurchase = {index:s.index, coins:s.coins, lives:s.lives};
+          s.coins -= 20; s.lives++; result = view(s);
+        }
+      } else if (req.url === '/answer' && s.lastAnswer && body.id === s.lastAnswer.id && body.answer === s.lastAnswer.submitted) {
+        result = {...view(s), feedback:s.lastAnswer.feedback};
       } else if (req.url === '/answer') {
         const q = s.questions[s.index];
         if (!s.lives || !q || q.id !== body.id) throw fail('Question has already closed.',409);
@@ -82,7 +95,8 @@ const server = http.createServer(async (req,res) => {
             correct = grade.correct;
           }
           award(s,correct);
-          result = {...view(s), feedback:{correct,answer:q.answer,quote:q.quote,explanation:q.explanation}};
+          result = {...view(s), feedback:{correct,submitted:body.answer,answer:q.answer,quote:q.quote,explanation:q.explanation}};
+          s.lastAnswer = {id:q.id, submitted:body.answer, feedback:result.feedback};
         } finally { s.busy = false; }
       } else throw fail('Unknown route.',404);
     }
