@@ -55,6 +55,16 @@ try {
     await page.goto(site);
     await page.getByText(/Quiz setup needed/).waitFor();
     assert.equal(await page.getByRole('button',{name:'+ Choose file'}).isDisabled(),true);
+    await click(voice);
+    await click('Play 2 questions →');
+    await click('A Freezing'); await click('Lock in answer →');
+    await page.getByText('MISS / −1 LIFE',{exact:true}).waitFor();
+    await click('Next question →');
+    await page.getByRole('textbox').fill('condensation'); await click('Lock in answer →');
+    await click('Next question →');
+    await click('B Evaporation'); await click('Lock in answer →'); await click('View results →');
+    await page.getByText('2 correct · 3 answered · 3 questions').waitFor();
+    await click('Start another run');
     await page.unroute('**/status');
     await click('Check connection again');
     async function pickNotes() {

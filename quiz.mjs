@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+let sequence = 0;
+const nextId = () => String(++sequence);
 
 export function makeSession(items, source, pages = []) {
   if (!Array.isArray(items) || !items.length || items.length > 12) throw Error('Invalid quiz length.');
@@ -12,7 +13,7 @@ export function makeSession(items, source, pages = []) {
       q.options.some(s => typeof s !== 'string' || !s.trim()) || new Set(q.options.map(normalize)).size !== 4 ||
       !q.options.includes(q.answer))) throw Error('Invalid options.');
     const page = pages.find(page=>normalize(page.text).includes(normalize(q.quote)));
-    return { ...q, location:page ? 'Page '+page.num : null, review: false, id: randomUUID() };
+    return { ...q, location:page ? 'Page '+page.num : null, review: false, id: nextId() };
   });
   return { questions, index: 0, lives: 3, coins: 0, correct: 0, busy: false, expires: Date.now() + 3600000 };
 }
@@ -33,6 +34,6 @@ export function award(s, correct) {
   if (correct) { s.correct++; s.coins += 10; }
   else {
     s.lives--;
-    if (!q.review) s.questions.push({ ...q, id: randomUUID(), review: true });
+    if (!q.review) s.questions.push({ ...q, id: nextId(), review: true });
   }
 }
