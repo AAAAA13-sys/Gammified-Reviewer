@@ -49,6 +49,15 @@ function Game() {
   const [feedback,setFeedback] = useState(null), [answer,setAnswer] = useState(''), [voice,setVoice] = useState('Tagalog');
   const [busy,setBusy] = useState(''), [error,setError] = useState('');
   const [saved,setSaved] = useState(''), [runName,setRunName] = useState('');
+  const [setup,setSetup] = useState('Checking quiz server…'), [checks,setChecks] = useState(0);
+  useEffect(()=>{
+    let active = true;
+    setSetup('Checking quiz server…');
+    post('/status',{}).then(({configured})=>{
+      if (active) setSetup(configured ? '' : 'Quiz setup needed. Set AI_API_KEY in the server .env file and restart the server.');
+    }).catch(e=>{if(active) setSetup(e.message);});
+    return ()=>{active=false;};
+  },[checks]);
   useEffect(()=>{AsyncStorage.getItem(storageKey).then(value=>setSaved(value || '')).catch(()=>{});},[]);
   function remember(value) {
     setSaved(value);
@@ -100,15 +109,17 @@ function Game() {
           <Text style={styles.title}>Notes mo.{'\n'}<Text style={{color:green}}>Sagot mo.</Text></Text>
           <Text style={styles.copy}>Turn your study file into a recall run. Tama? May coins. Mali? May resibo at trashtalk.</Text>
           {!!saved && <Button secondary disabled={!!busy} onPress={resume}>Resume last run  →</Button>}
+          {!!setup && <View style={styles.card} accessibilityLiveRegion="polite"><Text style={styles.copy}>{setup}</Text>
+            <Button secondary onPress={()=>setChecks(value=>value+1)}>Check connection again</Button></View>}
           <View style={styles.card}><Label>STUDY MATERIAL</Label>
             <Text style={styles.heading}>{asset?.name || 'Bring your reviewer'}</Text>
             <Text style={styles.copy}>PDF, DOCX, TXT or Markdown · up to 3 MB</Text>
-            <Button secondary disabled={!!busy} onPress={pick}>{asset ? 'Change file' : '+  Choose file'}</Button>
+            <Button secondary disabled={!!busy || !!setup} onPress={pick}>{asset ? 'Change file' : '+  Choose file'}</Button>
           </View>
           <Label>BOT LANGUAGE</Label>
           <View style={styles.row}>{Object.keys(voices).map(v=><Button key={v} secondary={voice!==v} disabled={!!busy} onPress={()=>setVoice(v)}>{v}</Button>)}</View>
           <Text style={styles.copy}>Uncensored roast mode. Starting sends your notes to the configured AI provider.</Text>
-          <Button onPress={start} disabled={!asset || !!busy}>Start recall run  →</Button>
+          <Button onPress={start} disabled={!asset || !!busy || !!setup}>Start recall run  →</Button>
         </> : <>
           <Label>{runName}</Label>
           <View style={styles.row}><Text style={styles.stat}>♥  {game.lives} lives</Text><Text style={styles.stat}>●  {game.coins} coins</Text></View>

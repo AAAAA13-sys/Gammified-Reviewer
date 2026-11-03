@@ -43,6 +43,10 @@ test('API supports upload, both question formats, evidence, rewards and extra li
     const response=await fetch(base+path,{method:'POST',body:JSON.stringify(body)});
     return {status:response.status,...await response.json()};
   };
+  assert.deepEqual(await post('/status',{}),{status:200,configured:true});
+  const smoke=spawn(process.execPath,['tests/live.mjs'],{env:{...process.env,EXPO_PUBLIC_API_URL:base}});
+  const [exitCode]=await once(smoke,'exit');
+  assert.equal(exitCode,0,'The live smoke-check script must exercise the same public API.');
   const game=await post('/quiz',{name:'water.txt',voice:'Bisaya',data:Buffer.from(notes).toString('base64')});
   assert.equal(game.status,200); assert.equal(game.lives,3); assert.equal(game.question.answer,undefined);
   assert.equal((await post('/life',{token:game.token})).status,400);

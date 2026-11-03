@@ -98,7 +98,9 @@ const server = http.createServer(async (req,res) => {
     try { body = JSON.parse(Buffer.concat(chunks).toString()); } catch { throw fail('Invalid request.'); }
     if (!body || typeof body !== 'object') throw fail('Invalid request.');
     let result;
-    if (req.url === '/quiz') {
+    if (req.url === '/status') {
+      result = {configured:Boolean(process.env.AI_API_KEY?.trim())};
+    } else if (req.url === '/quiz') {
       const {text:notes,pages} = await extract(body.name,body.data);
       const voice = body.voice === 'Bisaya' ? 'Bisaya' : 'Tagalog';
       const output = await ai('Create up to 8 distinct active recall questions solely from the study notes. Use typed recall for explanations and definitions. Use four-option multiple choice for distinctions or classifications. Include both formats when supported. Use the language of the material for questions and answers. Return {questions:[{type:"typed" or "choice",prompt,answer,options,quote,explanation}]}. Quote a short exact passage verbatim. Write the teaching explanation in the requested feedback language, preserving important technical terms. Explain why the answer follows. For choice, answer must exactly match one option. If insufficient facts return empty questions.',{notes,feedbackLanguage:voice});

@@ -51,7 +51,12 @@ try {
       await route.fulfill({response});
     });
     const click=name=>page.getByRole('button',{name,exact:true}).click();
+    await page.route('**/status',route=>route.fulfill({json:{configured:false},headers:{'Access-Control-Allow-Origin':'*'}}));
     await page.goto(site);
+    await page.getByText(/Quiz setup needed/).waitFor();
+    assert.equal(await page.getByRole('button',{name:'+ Choose file'}).isDisabled(),true);
+    await page.unroute('**/status');
+    await click('Check connection again');
     async function pickNotes() {
       const pickerEvent=page.waitForEvent('filechooser');
       await click('+ Choose file');

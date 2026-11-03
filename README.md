@@ -24,6 +24,8 @@ On a physical phone, put the phone and computer on the same trusted Wi-Fi. Set `
 
 ## Verification
 
+With a configured server running, execute `node --env-file-if-exists=.env tests/live.mjs` to check real AI generation and grading on the included one-page PDF. This makes a provider request to generate the quiz and an additional request if the first question has a typed answer. It prints the question, correction and evidence for inspection.
+
 `npm test` exercises the API with a local fixture provider, without credentials or billable calls. `npx expo export --platform all` creates web, Android and iOS bundles in `dist`. With Chrome installed, run `node tests/browser.mjs` after exporting to verify desktop and phone-width playthroughs.
 
 The API defaults to loopback for personal use. Before exposing a paid provider key through a public deployment, place the service behind authentication and request limits.
