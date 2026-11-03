@@ -52,9 +52,12 @@ try {
     });
     const click=name=>page.getByRole('button',{name,exact:true}).click();
     await page.goto(site);
-    const pickerEvent=page.waitForEvent('filechooser');
-    await click('+ Choose file');
-    await (await pickerEvent).setFiles({name:'circulation.txt',mimeType:'text/plain',buffer:Buffer.from(notes)});
+    async function pickNotes() {
+      const pickerEvent=page.waitForEvent('filechooser');
+      await click('+ Choose file');
+      await (await pickerEvent).setFiles({name:'circulation.txt',mimeType:'text/plain',buffer:Buffer.from(notes)});
+    }
+    await pickNotes();
     await click(voice);
     await click('Start recall run →');
     await click('B Vena cava'); await click('Lock in answer →');
@@ -77,6 +80,12 @@ try {
     assert.deepEqual(errors,[]);
     await click('Start another run');
     assert.equal(await page.getByRole('button',{name:'Resume last run →'}).count(),0);
+    await pickNotes();
+    await click('Start recall run →');
+    await page.route('**/answer',route=>route.fulfill({status:404,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({error:'Session expired. Start another run.'})}));
+    await click('A Aorta'); await click('Lock in answer →');
+    await page.getByText('Session expired. Start another run.').waitFor();
+    await page.getByRole('button',{name:'Start recall run →'}).waitFor({timeout:4000});
     await page.close(); console.log('Passed',width+'px',voice,'browser run');
   }
   await Promise.all([play(390,'Bisaya',Number(process.env.STUDY_PAUSE_MS || 0)),play(1280,'Tagalog',0)]);

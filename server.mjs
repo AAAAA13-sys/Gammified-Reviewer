@@ -23,23 +23,41 @@ async function extract(name, data) {
   if (typeof name !== 'string' || typeof data !== 'string') throw fail('Choose a file first.');
   const bytes = Buffer.from(data, 'base64');
   if (bytes.length > 3 * 1024 * 1024) throw fail('Choose a file under 3 MB.');
-  let text;
+  let text, pages = [];
   try {
     if (/\.pdf$/i.test(name)) {
       const parser = new PDFParse({data:bytes});
-      try { text = (await parser.getText()).text; } finally { await parser.destroy(); }
+      try {
+        const document = await parser.getText({first:201});
+        if (document.total > 200) throw fail('Choose a PDF chapter with at most 200 pages.');
+        pages = document.pages;
+        text = pages.map(page=>page.text).join('\n\n');
+      } finally { await parser.destroy(); }
     } else if (/\.docx$/i.test(name)) text = (await mammoth.extractRawText({buffer:bytes})).value;
-    else if (/\.(txt|md)$/i.test(name)) text = bytes.toString('utf8');
+    else if (/\.(txt|md)$/i.test(name)) {
+      let encoding = 'utf-8';
+      if (bytes[0] === 0xff && bytes[1] === 0xfe) encoding = 'utf-16le';
+      if (bytes[0] === 0xfe && bytes[1] === 0xff) encoding = 'utf-16be';
+      text = new TextDecoder(encoding,{fatal:true}).decode(bytes);
+    }
     else throw fail('Use PDF, DOCX, Markdown or TXT.');
   } catch (e) { throw e.status ? e : fail('Could not read this file. Try a text export.'); }
   if (text.trim().length < 40 || text.includes('\0')) throw fail('Too little readable text. Scans need a text export.');
   if (text.length > 60000) throw fail('Upload one chapter at a time (60,000 characters max).');
-  return text;
+  return {text,pages};
 }
 const cleanup = setInterval(() => { for (const [key,s] of sessions) if (s.expires < Date.now()) sessions.delete(key); }, 60000);
 cleanup.unref();
 const server = http.createServer(async (req,res) => {
-  res.setHeader('Access-Control-Allow-Origin', process.env.CLIENT_ORIGIN || '*');
+  const origin = req.headers.origin;
+  if (origin) {
+    if (!/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin) && origin !== process.env.CLIENT_ORIGIN) {
+      res.writeHead(403,{'Content-Type':'application/json'}).end(JSON.stringify({error:'Web origin is not configured for this server.'}));
+      return;
+    }
+    res.setHeader('Access-Control-Allow-Origin',origin);
+    res.setHeader('Vary','Origin');
+  }
   res.setHeader('Access-Control-Allow-Headers','Content-Type');
   res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS');
   res.setHeader('Cache-Control','no-store');
@@ -53,12 +71,12 @@ const server = http.createServer(async (req,res) => {
     if (!body || typeof body !== 'object') throw fail('Invalid request.');
     let result;
     if (req.url === '/quiz') {
-      const notes = await extract(body.name,body.data);
+      const {text:notes,pages} = await extract(body.name,body.data);
       const voice = body.voice === 'Bisaya' ? 'Bisaya' : 'Tagalog';
       const output = await ai('Create up to 8 distinct active recall questions solely from the study notes. Use typed recall for explanations and definitions. Use four-option multiple choice for distinctions or classifications. Include both formats when supported. Use the language of the material for questions and answers. Return {questions:[{type:"typed" or "choice",prompt,answer,options,quote,explanation}]}. Quote a short exact passage verbatim. Write the teaching explanation in the requested feedback language, preserving important technical terms. Explain why the answer follows. For choice, answer must exactly match one option. If insufficient facts return empty questions.',{notes,feedbackLanguage:voice});
       if (!output.questions?.length) throw fail('No quiz-worthy facts found. Try fuller notes.');
       let s;
-      try { s = makeSession(output.questions,notes); } catch { throw fail('Generated questions failed the evidence check. Retry the upload.',502); }
+      try { s = makeSession(output.questions,notes,pages); } catch { throw fail('Generated questions failed the evidence check. Retry the upload.',502); }
       s.name = body.name;
       s.voice = voice;
       const token = randomUUID(); sessions.set(token,s); result = {token,...view(s)};
@@ -95,7 +113,7 @@ const server = http.createServer(async (req,res) => {
             correct = grade.correct;
           }
           award(s,correct);
-          result = {...view(s), feedback:{correct,submitted:body.answer,answer:q.answer,quote:q.quote,explanation:q.explanation}};
+          result = {...view(s), feedback:{correct,submitted:body.answer,answer:q.answer,quote:q.quote,explanation:q.explanation,location:q.location}};
           s.lastAnswer = {id:q.id, submitted:body.answer, feedback:result.feedback};
         } finally { s.busy = false; }
       } else throw fail('Unknown route.',404);

@@ -27,3 +27,5 @@ On a physical phone, put the phone and computer on the same trusted Wi-Fi. Set `
 `npm test` exercises the API with a local fixture provider, without credentials or billable calls. `npx expo export --platform all` creates web, Android and iOS bundles in `dist`. With Chrome installed, run `node tests/browser.mjs` after exporting to verify desktop and phone-width playthroughs.
 
 The API defaults to loopback for personal use. Before exposing a paid provider key through a public deployment, place the service behind authentication and request limits.
+
+Browsers on the same computer can use a localhost or loopback origin. To use a browser on another device, set `CLIENT_ORIGIN` on the server to the exact Expo web origin, including its port. Native clients do not need this setting. PDF uploads can contain up to 200 pages. When a correction cites text from one PDF page, the feedback shows its page number.

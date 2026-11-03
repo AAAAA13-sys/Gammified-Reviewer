@@ -58,7 +58,11 @@ function Game() {
   async function perform(message,fn) {
     if (busy) return;
     setBusy(message); setError('');
-    try { await fn(); } catch(e) { setError(e.message); } finally { setBusy(''); }
+    try { await fn(); }
+    catch(e) {
+      if (game && e.status === 404) reset();
+      setError(e.message);
+    } finally { setBusy(''); }
   }
   function pick() { perform('Opening files…',async()=>{
     const r = await DocumentPicker.getDocumentAsync({copyToCacheDirectory:true});
@@ -114,7 +118,7 @@ function Game() {
             <Text style={[styles.heading,{color:feedback.correct?green:'#ffa28a'}]}>{lines[(game.index-1)%lines.length]}</Text>
             <Text style={styles.copy}>Your answer · {feedback.submitted}</Text>
             <Text style={styles.heading}>{feedback.answer}</Text><Text style={styles.copy}>{feedback.explanation}</Text>
-            <Label>FROM YOUR NOTES</Label><Text style={styles.quote}>“{feedback.quote}”</Text>
+            <Label>FROM YOUR NOTES{feedback.location ? '  /  '+feedback.location : ''}</Label><Text style={styles.quote}>“{feedback.quote}”</Text>
             <Button disabled={!!busy} onPress={()=>setFeedback(null)}>{q ? 'Next question  →' : 'View results  →'}</Button>
           </View> : q ? <View style={styles.card}>
             <Label>{q.review ? 'RECALL RETRY' : 'QUESTION'} {game.index+1} / {game.total}   ·   {q.type==='choice'?'PICK ONE':'WRITE IT'}</Label>

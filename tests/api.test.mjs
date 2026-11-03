@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { readFile } from 'node:fs/promises';
 
 const notes = 'Evaporation changes liquid water into vapor. Condensation changes vapor into liquid water.';
 const choice = {
@@ -26,6 +27,8 @@ test('API supports upload, both question formats, evidence, rewards and extra li
   t.after(()=>child.kill());
   const [ready]=await Promise.race([once(child.stdout,'data'),once(child,'exit').then(()=>{throw Error('Server exited before listening');})]);
   const base='http://127.0.0.1:'+String(ready).trim().split(' ').at(-1);
+  const unwanted=await fetch(base+'/quiz',{method:'POST',headers:{Origin:'https://unrelated.example'},body:'{}'});
+  assert.equal(unwanted.status,403);
   const post=async(path,body)=>{
     const response=await fetch(base+path,{method:'POST',body:JSON.stringify(body)});
     return {status:response.status,...await response.json()};
@@ -57,4 +60,13 @@ test('API supports upload, both question formats, evidence, rewards and extra li
   assert.equal(reviewed.question,null);
   assert.equal(reviewed.index,4);
   assert.equal((await post('/quiz',{name:'bad.exe',data:'YQ=='})).status,400);
+  for (const ext of ['docx','pdf']) {
+    const bytes=await readFile(new URL('./fixtures/water-cycle.'+ext,import.meta.url));
+    const fromFile=await post('/quiz',{name:'water.'+ext,data:bytes.toString('base64')});
+    assert.equal(fromFile.status,200,ext+' extraction: '+fromFile.error);
+    const graded=await post('/answer',{token:fromFile.token,id:fromFile.question.id,answer:'Melting'});
+    if(ext==='pdf') assert.equal(graded.feedback.location,'Page 1');
+  }
+  const utf16=await post('/quiz',{name:'water.txt',data:Buffer.from('\uFEFF'+notes,'utf16le').toString('base64')});
+  assert.equal(utf16.status,200);
 });
