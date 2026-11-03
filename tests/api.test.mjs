@@ -26,7 +26,9 @@ test('API supports upload, both question formats, evidence, rewards and extra li
       res.end(JSON.stringify({choices:[{message:{content:'null'}}]}));
       return;
     }
-    const result=data.notes ? {questions:[choice,typed,{...choice,prompt:'Choose the process for liquid to gas.'}]} : {correct:data.student==='Ang singaw ay nagiging tubig.',explanation:'Sa condensation, ang alisngaw mahimong likido.'};
+    const deck = data.notes?.includes('Revival exercise') ? Array.from({length:5},(_,i)=>({...choice,prompt:'Recall prompt '+(i+1)})) :
+      [choice,typed,{...choice,prompt:'Choose the process for liquid to gas.'}];
+    const result=data.notes ? {questions:deck} : {correct:data.student==='Ang singaw ay nagiging tubig.',explanation:'Sa condensation, ang alisngaw mahimong likido.'};
     res.end(JSON.stringify({choices:[{message:{content:JSON.stringify(result)}}]}));
   });
   provider.listen(0,'127.0.0.1'); await once(provider,'listening');
@@ -88,4 +90,15 @@ test('API supports upload, both question formats, evidence, rewards and extra li
   }
   const utf16=await post('/quiz',{name:'water.txt',data:Buffer.from('\uFEFF'+notes,'utf16le').toString('base64')});
   assert.equal(utf16.status,200);
+  const revival=await post('/quiz',{name:'revival.md',data:Buffer.from(notes+' Revival exercise').toString('base64')});
+  let round=revival;
+  for (const answer of ['Evaporation','Evaporation','Melting','Melting','Melting']) {
+    round=await post('/answer',{token:revival.token,id:round.question.id,answer});
+  }
+  assert.equal(round.question,null); assert.equal(round.lives,0); assert.equal(round.coins,20);
+  assert.equal(round.reviewNotes.length,3);
+  const revive=await post('/life',{token:revival.token,coins:20,lives:0});
+  assert.equal(revive.lives,1); assert.equal(revive.coins,0); assert.equal(revive.question.review,true);
+  const continued=await post('/answer',{token:revival.token,id:revive.question.id,answer:'Evaporation'});
+  assert.equal(continued.feedback.correct,true); assert.equal(continued.coins,10);
 });
