@@ -18,7 +18,15 @@ test('API supports upload, both question formats, evidence, rewards and extra li
   const provider = http.createServer(async(req,res)=>{
     let raw=''; for await (const chunk of req) raw+=chunk;
     const data=JSON.parse(JSON.parse(raw).messages[1].content);
-    const result=data.notes ? {questions:[choice,typed,{...choice,prompt:'Choose the process for liquid to gas.'}]} : {correct:data.student==='Ang singaw ay nagiging tubig.'};
+    if (data.student === 'provider-refused') {
+      res.end(JSON.stringify({choices:[{message:{refusal:'Unable to grade this answer.'}}]}));
+      return;
+    }
+    if (data.student === 'invalid-result') {
+      res.end(JSON.stringify({choices:[{message:{content:'null'}}]}));
+      return;
+    }
+    const result=data.notes ? {questions:[choice,typed,{...choice,prompt:'Choose the process for liquid to gas.'}]} : {correct:data.student==='Ang singaw ay nagiging tubig.',explanation:'Sa condensation, ang alisngaw mahimong likido.'};
     res.end(JSON.stringify({choices:[{message:{content:JSON.stringify(result)}}]}));
   });
   provider.listen(0,'127.0.0.1'); await once(provider,'listening');
@@ -42,8 +50,15 @@ test('API supports upload, both question formats, evidence, rewards and extra li
   const retry=await reply(game.question.id,'Evaporation');
   assert.deepEqual(retry,first);
   assert.equal((await reply(game.question.id,'Melting')).status,409);
+  for (const input of ['provider-refused','invalid-result']) {
+    const failed=await reply(first.question.id,input);
+    assert.equal(failed.status,502);
+    const state=await post('/resume',{token:game.token});
+    assert.equal(state.coins,10); assert.equal(state.lives,3); assert.equal(state.question.id,first.question.id);
+  }
   const second=await reply(first.question.id,'Ang singaw ay nagiging tubig.');
   assert.equal(second.coins,20); assert.equal(second.feedback.correct,true);
+  assert.equal(second.feedback.explanation,'Sa condensation, ang alisngaw mahimong likido.');
   const purchase={token:game.token,lives:second.lives,coins:second.coins};
   const bought=await post('/life',purchase);
   assert.equal(bought.coins,0); assert.equal(bought.lives,4);
