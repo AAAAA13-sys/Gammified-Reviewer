@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "Recall Riot",
+    "slug": "recall-riot",
+    "version": "1.0.0",
+    "userInterfaceStyle": "dark",
+    "android": {"package":"com.recallriot.reviewer"},
+    "ios": {"bundleIdentifier":"com.recallriot.reviewer"},
+    "web": {"bundler":"metro"}
+  }
+}
